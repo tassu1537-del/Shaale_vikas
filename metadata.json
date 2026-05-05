@@ -1,0 +1,11 @@
+{
+  "name": "Shaale-Vikas",
+  "description": "A school-alumni bridge for rural school development. Headmasters list infrastructure needs, and alumni pledge support to ensure transparency and community ownership.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "Real-time Collaboration",
+    "Social/Community"
+  ]
+}

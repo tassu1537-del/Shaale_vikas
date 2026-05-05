@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow create: if isVerifiedUser() && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isVerifiedUser() && userId == request.auth.uid && isValidUser(incoming()) &&
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photoUrl', 'userType', 'schoolId'])
+        );
+
+      function isValidUser(data) {
+        return data.keys().hasAll(['id', 'name', 'email', 'userType']) &&
+               data.keys().size() <= 6 &&
+               data.id == request.auth.uid &&
+               data.email == request.auth.token.email &&
+               data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               data.userType in ['headmaster', 'alumni'];
+      }
+    }
+
+    // --- Schools ---
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow create: if isVerifiedUser() && isValidId(schoolId) && isValidSchool(incoming());
+      allow update: if isVerifiedUser() && existing().headmasterUid == request.auth.uid && isValidSchool(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'location', 'description', 'coverPhotoUrl']);
+
+      function isValidSchool(data) {
+        return data.keys().hasAll(['id', 'name', 'location', 'headmasterUid']) &&
+               data.id == schoolId &&
+               data.name is string && data.name.size() < 200 &&
+               data.location is string && data.location.size() < 200 &&
+               data.headmasterUid == request.auth.uid;
+      }
+    }
+
+    // --- Needs ---
+    match /needs/{needId} {
+      allow read: if true;
+      allow create: if isVerifiedUser() && isValidId(needId) && isValidNeed(incoming()) &&
+        get(/databases/$(database)/documents/schools/$(incoming().schoolId)).data.headmasterUid == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidNeed(incoming()) && (
+        // Action: Headmaster Edit
+        (get(/databases/$(database)/documents/schools/$(existing().schoolId)).data.headmasterUid == request.auth.uid &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'costEstimate', 'category', 'beforePhotoUrl', 'afterPhotoUrl', 'status', 'updatedAt'])) ||
+        // Action: Alumnus Pledge Increment
+        (incoming().diff(existing()).affectedKeys().hasOnly(['amountCollected', 'status', 'updatedAt']) &&
+         incoming().amountCollected >= existing().amountCollected)
+      );
+
+      function isValidNeed(data) {
+        return data.keys().hasAll(['id', 'schoolId', 'title', 'description', 'costEstimate', 'status', 'category', 'createdAt', 'amountCollected']) &&
+               data.id == needId &&
+               data.costEstimate is number && data.costEstimate >= 0 &&
+               data.amountCollected is number && data.amountCollected >= 0 &&
+               data.status in ['open', 'pledged', 'completed'] &&
+               data.category in ['infrastructure', 'supplies', 'tech', 'other'] &&
+               data.title.size() < 200 && data.description.size() < 2000;
+      }
+    }
+
+    // --- Pledges ---
+    match /pledges/{pledgeId} {
+      allow read: if isSignedIn();
+      allow create: if isVerifiedUser() && isValidId(pledgeId) && isValidPledge(incoming()) &&
+        existsAfter(/databases/$(database)/documents/needs/$(incoming().needId));
+
+      function isValidPledge(data) {
+        return data.keys().hasAll(['id', 'needId', 'donorUid', 'donorName', 'amount', 'pledgeType', 'createdAt']) &&
+               data.donorUid == request.auth.uid &&
+               data.amount >= 0 &&
+               data.pledgeType in ['item', 'funds'] &&
+               data.createdAt == request.time;
+      }
+    }
+  }
+}

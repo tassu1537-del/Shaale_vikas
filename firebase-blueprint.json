@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user of the platform (Headmaster or Alumni)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "userType": { "type": "string", "enum": ["headmaster", "alumni"] },
+        "schoolId": { "type": "string", "description": "For headmasters, the school they manage" }
+      },
+      "required": ["id", "name", "email", "userType"]
+    },
+    "School": {
+      "title": "School",
+      "description": "Information about a rural school",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "headmasterUid": { "type": "string" },
+        "coverPhotoUrl": { "type": "string" }
+      },
+      "required": ["id", "name", "location", "headmasterUid"]
+    },
+    "Need": {
+      "title": "Need",
+      "description": "A specific repair or item needed by a school",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "costEstimate": { "type": "number" },
+        "amountCollected": { "type": "number", "description": "Amount pledged/collected so far" },
+        "status": { "type": "string", "enum": ["open", "pledged", "completed"] },
+        "category": { "type": "string", "enum": ["infrastructure", "supplies", "tech", "other"] },
+        "beforePhotoUrl": { "type": "string" },
+        "afterPhotoUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "schoolId", "title", "description", "costEstimate", "status", "category", "createdAt"]
+    },
+    "Pledge": {
+      "title": "Pledge",
+      "description": "A commitment by an alumnus to fulfill a need",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "needId": { "type": "string" },
+        "donorUid": { "type": "string" },
+        "donorName": { "type": "string" },
+        "amount": { "type": "number" },
+        "pledgeType": { "type": "string", "enum": ["item", "funds"] },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "fulfilled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "needId", "donorUid", "donorName", "amount", "pledgeType", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/schools/{schoolId}": {
+      "schema": "School",
+      "description": "School details"
+    },
+    "/needs/{needId}": {
+      "schema": "Need",
+      "description": "School needs and repairs"
+    },
+    "/pledges/{pledgeId}": {
+      "schema": "Pledge",
+      "description": "Alumni pledges"
+    }
+  }
+}
